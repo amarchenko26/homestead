@@ -50,7 +50,7 @@ run_scrape = 0
 if run_get_url == 1:
     
     # finished 1895-1898 years, this is now stored in diff .csv
-    years = range(1873, 1874)
+    years = range(1885, 1886)
     #years = [year for year in range(1863, 1909) if year not in [1895, 1896, 1897, 1898]] #what i used to remove the yrs i'd already done
     wy_urls = []
     
@@ -70,20 +70,18 @@ if run_get_url == 1:
             soup = BeautifulSoup(driver.page_source, 'lxml')
             
             # Find all elements with class 'tblrow record' (the view record)
-            
             urls = [tag['jsopen'] for tag in soup.find_all('tr', class_=('tblrow record','tblrowalt record', 'calloutTrigger'))]
-            row_text = soup.find_all('tr', class_=('tblrow record'))
-            row_text = [row.text for row in row_text] # makes it a list
+            rows_text = soup.find_all('tr', class_=('tblrow record'))
+            rows_text = [row.text for row in rows_text] # makes it a list
             
-            # Split the string into lines
-            #test_row = row_text[0]
-#            lines = for row in row_text.strip().split('\n')
+            #NOTE: some ppl don't have names. this might fuck up column matching in the df. go on page 2 of all WY exact search and see how it did with no name people. 
+            page_rows_pd = pd.DataFrame(columns=["Name","Final Certificate Date","Land Office","State"])
 
-            # Extract the name, date, location, and state
- #           info_list = [lines[1], lines[2], lines[3], lines[4]]
+            for row in rows_text:
+                page_rows_pd.loc[len(page_rows_pd.index)] = row.split("View Record")[1].split("\n")[1:5]
 
-            # save URLs to list
-            #wy_urls.extend(urls)
+            # code breaks here b/c its only pulling 25 not 50 rows from the first page. 
+            page_rows_pd['url'] = urls
                 
 # =============================================================================
 #             # save URLs to .csv every 5 pages
@@ -102,9 +100,7 @@ if run_get_url == 1:
             except:
                 print(f"No next page found for year {year} after {page}")
                 break  # Exit the while loop if an exception occurs
-             
-             #xpath for next button = //*[@id="pageSets"]/ul/li[5]/a
-        
+                     
             page += 1  
 
 print("Finished getting WY URLs")
