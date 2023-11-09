@@ -20,7 +20,7 @@ from selenium.webdriver.common.by import By
 ## Selenium set up
 ###############################################################################
 
-# Selenium chromedriver path on my computer, installed with 'brew install --cask chromedriver'
+# Selenium chromedriver path on my computer, installed in command line with 'brew install --cask chromedriver'
 DRIVER_PATH = "/usr/local/bin/chromedriver"
 service = Service(executable_path = DRIVER_PATH)
 
@@ -38,21 +38,21 @@ driver = webdriver.Chrome(service = service, options = options)
 ## Choose code to run
 ###############################################################################
 
-run_get_url = 1
-run_scrape = 0
+run_get_url = 0
+run_scrape = 1
 
 
 
 ###############################################################################
-## Get URLs to scrape from
+## Get URLs to scrape, (1863-1908)
 ###############################################################################
 
 if run_get_url == 1:
     
-    # finished 1895-1898 years, this is now stored in diff .csv
-    years = range(1885, 1886)
+    # range is exclusive of stop year, add additional year
+    years = range(1863, 1909)
     #years = [year for year in range(1863, 1909) if year not in [1895, 1896, 1897, 1898]] #what i used to remove the yrs i'd already done
-    wy_urls = []
+    wy_urls_df = pd.DataFrame()
     
     for year in years:
         
@@ -71,29 +71,26 @@ if run_get_url == 1:
             
             # Find all elements with class 'tblrow record' (the view record)
             urls = [tag['jsopen'] for tag in soup.find_all('tr', class_=('tblrow record','tblrowalt record', 'calloutTrigger'))]
-            rows_text = soup.find_all('tr', class_=('tblrow record'))
+            rows_text = soup.find_all('tr', class_=('tblrow record','tblrowalt record'))
             rows_text = [row.text for row in rows_text] # makes it a list
             
-            #NOTE: some ppl don't have names. this might fuck up column matching in the df. go on page 2 of all WY exact search and see how it did with no name people. 
-            page_rows_pd = pd.DataFrame(columns=["Name","Final Certificate Date","Land Office","State"])
+            page_rows_df = pd.DataFrame(columns=["Name","Final Certificate Date","Land Office","State"])
 
             for row in rows_text:
-                page_rows_pd.loc[len(page_rows_pd.index)] = row.split("View Record")[1].split("\n")[1:5]
+                page_rows_df.loc[len(page_rows_df.index)] = row.split("View Record")[1].split("\n")[1:5]
 
-            # code breaks here b/c its only pulling 25 not 50 rows from the first page. 
-            page_rows_pd['url'] = urls
-                
-# =============================================================================
-#             # save URLs to .csv every 5 pages
-#             if page % 5 == 0:
-#                 # convert list to df
-#                 df = pd.DataFrame()
-#                 df["wy_urls"] = wy_urls
-#                 df.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/wy_urls.csv', index=False)
-#             
-#             # click next button
-#             sleep(2)
-#         
+            page_rows_df['url'] = urls
+            
+            # Add page_rows_df to wy_urls df, concat takes care of when columns differ b/w records          
+            wy_urls_df = pd.concat([wy_urls_df, page_rows_df], axis = 0) 
+            
+             # save URLs to .csv every 5 pages
+            if page % 5 == 0:
+                wy_urls_df.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/homestead_data/wy_urls_df.csv', index=False)
+             
+            sleep(2)
+            
+            # click next button
             try:
                 next_button = driver.find_element(By.CLASS_NAME, 'ancBtn.sml.green.icon.iconArrowRight')
                 next_button.click()
@@ -102,18 +99,28 @@ if run_get_url == 1:
                 break  # Exit the while loop if an exception occurs
                      
             page += 1  
+            
+    # reset the index
+    wy_urls_df.reset_index(inplace=True)
+    wy_urls_df = wy_urls_df.drop("index",axis = 1)
+    
+    wy_urls_df.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/homestead_data/wy_urls_df.csv', index=False)
+    print("Finished getting WY URLs")
+    
+    # drop duplicate people
+    non_url_cols = [col for col in wy_urls_df.columns if col != "url"]
+    wy_urls_df_no_dupes = wy_urls_df.drop_duplicates(non_url_cols)
+    print("Finished dropping duplicates in WY URLs")
+    wy_urls_df_no_dupes.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/homestead_data/wy_urls_df_no_dupes.csv', index=False)
 
-print("Finished getting WY URLs")
+
 
 ###############################################################################
 ## Scrape each record
 ###############################################################################
 
-
-# code stops finding tables after URL #5. Is this a website issue? Let's try a random 6 URLs. 
-#test_urls = wy_urls[53:80] #6 elements
-
-wy_urls_minus_50 = wy_urls[50:]
+wy_urls_df_no_dupes = pd.read_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/homestead_data/wy_urls_df_no_dupes.csv')
+wy_urls = wy_urls_df_no_dupes['url']
 
 if run_scrape == 1:
     
@@ -121,10 +128,10 @@ if run_scrape == 1:
     patents = pd.DataFrame()
 
     # Navigate to a random record 
-    record = driver.get(wy_urls_minus_50[0])
+    record = driver.get(wy_urls[0])
     
     count = 1
-    for url in wy_urls_minus_50:
+    for url in wy_urls:
     
         # Navigate to correct record
         time.sleep(2)
@@ -163,7 +170,7 @@ if run_scrape == 1:
         
         # save URLs to .csv every 50 names
         if count % 50 == 0:
-            patents.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/wy_patents.csv', index=False)
+            patents.to_csv('/Users/anyamarchenko/Documents/GitHub/homestead/data/homestead_data/wy_patents.csv', index=False)
         
         count += 1
 
