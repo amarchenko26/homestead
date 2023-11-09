@@ -10,6 +10,7 @@ import time
 from bs4 import BeautifulSoup
 from time import sleep
 import pandas as pd
+import random
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -28,6 +29,7 @@ service = Service(executable_path = DRIVER_PATH)
 options = webdriver.ChromeOptions()
 options.add_argument("start-maximized") # start with max screen
 options.add_argument("-headless") # uncomment this to have it not open browser
+options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 
 # Chrome driver installation
 driver = webdriver.Chrome(service = service, options = options)
@@ -142,13 +144,13 @@ if run_scrape == 1:
         
         print(f"Parsed URL number {count}")
         
-        time.sleep(5)
+        random_time = random.uniform(2, 9)  # Generate a random float between 1 and 10
+        time.sleep(random_time)
         
-        # Find all elements with id = 'recordServiceData'
-        table = soup.find_all(id ='recordServiceData')
+        try: 
+            # Find all elements with id = 'recordServiceData'
+            table = soup.find_all(id ='recordServiceData')
     
-        if table:
-            
             # Grab first col of table
             col_names = [th.text for th in table[0].find_all('th')]
             
@@ -164,9 +166,8 @@ if run_scrape == 1:
             # Concat takes care of when columns differ b/w records          
             patents = pd.concat([patents, row_df], axis = 0) #columns are axis = 1 b/c columns look like a 1
             
-        else:
+        except:
             print(f"No table found for url {url}.")
-            break
         
         # save URLs to .csv every 50 names
         if count % 50 == 0:
